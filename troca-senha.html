@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DTEL — Definir Nova Senha</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:linear-gradient(135deg,#003D1F 0%,#006633 60%,#005229 100%);
+       font-family:Arial,sans-serif;}
+  .card{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:420px;
+        box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+  .logo{text-align:center;margin-bottom:28px;}
+  .logo-box{background:#006633;color:#F5C800;font-size:22px;font-weight:900;
+             padding:10px 20px;border-radius:10px;display:inline-block;letter-spacing:1px;}
+  h2{font-size:18px;font-weight:800;color:#003D1F;margin-bottom:6px;text-align:center;}
+  .sub{font-size:13px;color:#666;text-align:center;margin-bottom:24px;line-height:1.5;}
+  label{display:block;font-size:12px;font-weight:700;color:#003D1F;margin-bottom:5px;margin-top:14px;}
+  input{width:100%;padding:11px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;
+        outline:none;transition:border 0.2s;}
+  input:focus{border-color:#006633;}
+  .btn{width:100%;padding:13px;background:#006633;color:#F5C800;border:none;border-radius:10px;
+       font-size:15px;font-weight:800;cursor:pointer;margin-top:20px;transition:background 0.2s;}
+  .btn:hover{background:#005229;}
+  .btn:disabled{background:#aaa;cursor:not-allowed;}
+  .erro{background:#FEE2E2;color:#991B1B;border:1px solid #FECDD3;border-radius:8px;
+        padding:10px 14px;font-size:12px;margin-top:14px;display:none;}
+  .ok{background:#DCFCE7;color:#14532D;border:1px solid #BBF7D0;border-radius:8px;
+      padding:10px 14px;font-size:12px;margin-top:14px;display:none;}
+  .campo-usuario{background:#F4FAF7;padding:12px 14px;border-radius:8px;
+                  font-size:14px;font-weight:700;color:#003D1F;margin-bottom:4px;
+                  border:1.5px solid #B7F5C8;}
+  .step{display:none;}
+  .step.ativo{display:block;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-box">DTEL<span style="color:#fff;font-size:14px;">+</span></div>
+  </div>
+
+  <!-- PASSO 1: Informa usuário -->
+  <div id="step1" class="step ativo">
+    <h2>Definir Nova Senha</h2>
+    <div class="sub">Informe seu usuário para continuar.</div>
+    <label>Usuário</label>
+    <input type="text" id="s1-usuario" placeholder="Seu nome de usuário">
+    <label>Senha Recebida no E-mail</label>
+    <input type="password" id="s1-senha" placeholder="Digite a senha recebida">
+    <div id="s1-erro" class="erro"></div>
+    <button class="btn" onclick="validarAcesso()">Continuar →</button>
+  </div>
+
+  <!-- PASSO 2: Define nova senha -->
+  <div id="step2" class="step">
+    <h2>Crie sua Nova Senha</h2>
+    <div class="sub" id="s2-boas-vindas"></div>
+    <div class="campo-usuario" id="s2-usuario-label"></div>
+    <label>Nova Senha</label>
+    <input type="password" id="s2-nova" placeholder="Mínimo 6 caracteres">
+    <label>Confirmar Nova Senha</label>
+    <input type="password" id="s2-confirma" placeholder="Repita a nova senha">
+    <div id="s2-erro" class="erro"></div>
+    <div id="s2-ok" class="ok"></div>
+    <button class="btn" id="s2-btn" onclick="salvarNovaSenha()">✅ Salvar e Acessar</button>
+  </div>
+</div>
+
+<script>
+var _usuario = '';
+
+// Substitui google.script.run: chama a função serverless via fetch()
+function chamarApi(endpoint, payload) {
+  return fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r){
+    return r.json().then(function(data){
+      if(!r.ok && !data){ throw new Error('Erro de conexão.'); }
+      return data;
+    });
+  });
+}
+
+function validarAcesso(){
+  var u = document.getElementById('s1-usuario').value.trim();
+  var s = document.getElementById('s1-senha').value;
+  var erro = document.getElementById('s1-erro');
+  erro.style.display='none';
+  if(!u||!s){erro.style.display='block';erro.textContent='Preencha usuário e senha.';return;}
+
+  var btn = document.querySelector('#step1 .btn');
+  btn.disabled=true;
+  btn.textContent='Verificando...';
+
+  chamarApi('/api/auth', { action: 'login-troca', usuario: u, senha: s })
+    .then(function(res){
+      btn.disabled=false;
+      btn.textContent='Continuar →';
+      if(res && res.ok){
+        _usuario = u;
+        document.getElementById('s2-usuario-label').textContent='👤 '+u;
+        document.getElementById('s2-boas-vindas').textContent = res.senhaTemp
+          ? 'Sua senha é temporária. Defina uma nova para acessar o sistema.'
+          : 'Redefina sua senha abaixo.';
+        document.getElementById('step1').classList.remove('ativo');
+        document.getElementById('step2').classList.add('ativo');
+        document.getElementById('s2-nova').focus();
+      } else {
+        erro.style.display='block';
+        erro.textContent='❌ '+(res&&res.erro?res.erro:'Usuário ou senha incorretos.');
+      }
+    })
+    .catch(function(e){
+      btn.disabled=false;
+      btn.textContent='Continuar →';
+      erro.style.display='block';
+      erro.textContent='Erro de conexão: '+e.message;
+    });
+}
+
+function salvarNovaSenha(){
+  var nova     = document.getElementById('s2-nova').value;
+  var confirma = document.getElementById('s2-confirma').value;
+  var erro     = document.getElementById('s2-erro');
+  var ok       = document.getElementById('s2-ok');
+  erro.style.display='none'; ok.style.display='none';
+
+  if(nova.length<6){erro.style.display='block';erro.textContent='A senha deve ter pelo menos 6 caracteres.';return;}
+  if(nova!==confirma){erro.style.display='block';erro.textContent='As senhas não coincidem.';return;}
+
+  var btn = document.getElementById('s2-btn');
+  btn.disabled=true; btn.textContent='Salvando...';
+
+  chamarApi('/api/auth', { action: 'alterar-senha-temp', usuario: _usuario, novaSenha: nova })
+    .then(function(res){
+      btn.disabled=false; btn.textContent='✅ Salvar e Acessar';
+      if(res && res.ok){
+        ok.style.display='block';
+        ok.textContent='✅ Senha definida com sucesso! Você já pode acessar o sistema.';
+        btn.textContent='🔐 Ir para o Sistema';
+        btn.onclick=function(){ window.top.location.href='/'; };
+      } else {
+        erro.style.display='block';
+        erro.textContent='❌ '+(res&&res.erro?res.erro:'Erro ao salvar senha.');
+      }
+    })
+    .catch(function(e){
+      btn.disabled=false; btn.textContent='✅ Salvar e Acessar';
+      erro.style.display='block';
+      erro.textContent='Erro: '+e.message;
+    });
+}
+</script>
+</body>
+</html>
